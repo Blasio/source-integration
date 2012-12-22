@@ -1,0 +1,23 @@
+The post-receive.tmpl hook can be copied to the hooks folder of any repository that
+is to be re-imported in Mantis/Source after a push.  If working with Gitolite g3
+the following is the recommended setup:
+
+1) Add a local-code/hooks/common/ directory structure under the .gitolite directory
+   in the home directory of the account hosting gitolite.
+
+2) Copy post-receive.tmpl as post-receive in local-code/hooks/common/
+
+3) Edit the post-receive hook to set the MANTIS, API_KEY and BRANCHES variables.
+
+   a) MANTIS should be set to the root folder of your Mantis instance.
+   b) API_KEY should be set to the same value set in the SourceIntegration section
+      of the Mantis instance.
+   c) BRANCHES should be set to the list of references that should trigger an update
+      or left blank to trigger an update for any reference/branch.
+
+4) Edit the .gitolite.rc file to add a local code entry, such as:
+	LC_LOCAL_CODE = '.gitolite/local-code'
+
+5) Switch to the gitolite account and run 'gitolite setup'.
+
+The last step will cause gitolite to symlink the post-receive hook to all repositories it is managing to be run after every push.
