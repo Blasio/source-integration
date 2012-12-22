@@ -1,20 +1,64 @@
-#!/bin/sh
-
-# Copyright (c) 2012 John Reese
+#!/bin/bash
+# Copyright (c) 2012 Blasio Muscat
+# Based on the original hook by John Reese
 # Licensed under the MIT license
 
-read LINE
+# MantisBT instance to update
+MANTIS="http://localhost/MantisBT/"
+API_KEY=""
 
-# Handle branch names with '+' character
-LINE=`echo $LINE | sed -e 's/+/_plus_/g'`
+# Branches to be handled
+BRANCHES="master"
 
-LINE=`echo $LINE | sed -e 's/ /+/g'`
-
-URL="http://localhost/mantisbt/plugin.php?page=Source/checkin"
-PROJECT="test"
-API_KEY="test"
+# Set project name automatically.  Assumes the repository as defined in
+# Mantis does not have the .git suffix at the end.
+PROJECT=`pwd`
+PROJECT=`basename $PROJECT .git`
 
 CURL=/usr/bin/curl
+URL="${MANTIS}plugin.php?page=Source/checkin"
 
-echo "Updating Changeset to Mantis Bug Tracker"
-${CURL} -sS -d "api_key=${API_KEY}" -d "repo_name=${PROJECT}" -d "data=${LINE}" ${URL}
+# TODO: Get a list of projects tracked by mantis and exit here if
+# PROJECT is not in that list.
+
+echo "MantisBT update hook, checking refs"
+
+matches=0
+# Process each ref update line, only handle the ones matching BRANCHES
+while read -r LINE; do
+
+	match="0"
+	result=""
+	if [ "$BRANCES" == "" ]; then
+		match=1
+	else
+		for branch in "$BRANCHES"; do
+			[[ "$LINE" == *$branch ]] && match=1 || :
+		done
+	fi
+
+	# Handle branch names with '+' character
+	LINE=`echo $LINE | sed -e 's/+/_plus_/g'`
+	LINE=`echo $LINE | sed -e 's/ /+/g'`
+
+	if [ "$match" == "1" ]; then
+
+		let matches=matches+1
+
+		echo "Branch [$branch] changed, updating changesets"
+
+		result=$(${CURL} -sS -d "api_key=${API_KEY}" -d "repo_name=${PROJECT}" -d "data=${LINE}" ${URL})
+
+		# result == "Retrieving ..." on success and "Invalid repository name" if the repository is not
+		# defined within Mantis.  TODO: Get something cleaner in place here.
+		if [ "$result" == "Invalid repository name" ]; then
+			result="Repository is not tracked by Mantis, doing nothing"
+		fi
+
+		if [[ "$result" != "Retrieving "* ]]; then
+			echo $result
+		fi
+	fi
+done
+
+echo "$matches match(es) found."
