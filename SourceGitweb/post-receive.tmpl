@@ -24,6 +24,7 @@ URL="${MANTIS}plugin.php?page=Source/checkin"
 # Check against entries in PROJECTS_FILE (if specified)
 if [[ "$PROJECTS_FILE" != "" && -f "$PROJECTS_FILE" ]]; then
 	listed=0
+	echo "MantisBT - Checking against gitweb projects list."
 	while read -r LINE; do
 		if [[ $LINE == *"${PROJECT}.git"* ]]; then
 			listed=1
@@ -31,6 +32,7 @@ if [[ "$PROJECTS_FILE" != "" && -f "$PROJECTS_FILE" ]]; then
 		fi
 	done < "$PROJECTS_FILE"
 	if [[ $listed == 0 ]]; then
+		echo "MantisBT - Project not listed.  Doing nothing."
 		exit 0
 	fi
 fi
@@ -38,9 +40,6 @@ fi
 # TODO: Get a list of projects tracked by mantis and exit here if
 # PROJECT is not in that list.
 
-echo "MantisBT update hook, checking refs"
-
-matches=0
 # Process each ref update line, only handle the ones matching BRANCHES
 while read -r LINE; do
 
@@ -48,9 +47,13 @@ while read -r LINE; do
 	result=""
 	if [ "$BRANCHES" == "" ]; then
 		match=1
+		echo "MantisBT - Branch checking disabled, updating changesets."
 	else
 		for branch in "$BRANCHES"; do
-			[[ "$LINE" == *$branch ]] && match=1 || :
+			if [[ "$LINE" == *$branch ]]; then
+				match=1
+				echo "MantisBT - Branch [$branch] changed, updating changesets."
+			fi
 		done
 	fi
 
@@ -60,22 +63,19 @@ while read -r LINE; do
 
 	if [ "$match" == "1" ]; then
 
-		let matches=matches+1
-
-		echo "Branch [$branch] changed, updating changesets"
-
 		result=$(${CURL} -sS -d "api_key=${API_KEY}" -d "repo_name=${PROJECT}" -d "data=${LINE}" ${URL})
 
 		# result == "Retrieving ..." on success and "Invalid repository name" if the repository is not
 		# defined within Mantis.  TODO: Get something cleaner in place here.
 		if [ "$result" == "Invalid repository name" ]; then
-			result="Repository is not tracked by Mantis, doing nothing"
+			result="MantisBT - Repository is not tracked by Mantis. Doing nothing."
 		fi
 
 		if [[ "$result" != "Retrieving "* ]]; then
+			echo "MantisBT - Error encountered while updating changesets:"
 			echo $result
+		else
+			echo "MantisBT - Changesets updated."
 		fi
 	fi
 done
-
-echo "$matches match(es) found."
